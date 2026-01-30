@@ -12,14 +12,17 @@ import java.util.UUID;
 @Service
 public class SendNotificationUseCase {
     private final NotificationRepository repository;
+    private final PublishNotificationUseCase publisher;
 
-    public SendNotificationUseCase(NotificationRepository repository) {
+    public SendNotificationUseCase(NotificationRepository repository, PublishNotificationUseCase publisher) {
         this.repository = repository;
+        this.publisher = publisher;
     }
 
     @Transactional
     public UUID execute(Notification notification) {
         repository.save(notification);
+        publisher.publish(notification.getId());
         return notification.getId();
     }
 

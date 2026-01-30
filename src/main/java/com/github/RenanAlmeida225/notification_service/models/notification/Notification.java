@@ -27,6 +27,7 @@ public class Notification {
     private String message;
     private int attempts;
     private Instant lastAttemptAt;
+    private Instant nextAttemptAt;
     private Instant createdAt;
 
 
@@ -49,6 +50,7 @@ public class Notification {
         this.status = NotificationStatus.PENDING;
         this.attempts = 0;
         this.lastAttemptAt = null;
+        this.nextAttemptAt = Instant.now();
         this.createdAt = Instant.now();
 
     }
@@ -76,39 +78,27 @@ public class Notification {
         this.attempts++;
         this.lastAttemptAt = Instant.now();
     }
+    
+
+    public boolean canRetryNow(int maxAttempts) {
+        return attempts < maxAttempts &&
+                nextAttemptAt != null &&
+                !nextAttemptAt.isAfter(Instant.now());
+    }
+
+    public boolean canRetry(int maxAttempts) {
+        return attempts < maxAttempts;
+    }
 
     public void markAsRetrying() {
         this.status = NotificationStatus.RETRYING;
+        this.attempts++;
+        this.nextAttemptAt = Instant.now().plusSeconds(calculateBackoff());
     }
 
-
-    public boolean canRetry(int maxAttempts) {
-        return this.attempts < maxAttempts &&
-                this.status != NotificationStatus.FAILED;
-    }
-
-
-    public boolean canBeProceed() {
-        return this.status == NotificationStatus.PENDING
-                || this.status == NotificationStatus.FAILED;
-    }
-
-    public boolean canRetryNow(int maxAttempts) {
-        if (this.attempts >= maxAttempts) {
-            return false;
-        }
-
-        if (this.lastAttemptAt == null) {
-            return true;
-        }
-
-        long backoffSeconds = calculateBackoffSeconds();
-        return lastAttemptAt.plusSeconds(backoffSeconds).isBefore(Instant.now());
-    }
-
-    private long calculateBackoffSeconds() {
-        // backoff exponencial simples: 5s, 15s, 45s...
-        return (long) Math.pow(3, attempts) * 5;
+    private long calculateBackoff() {
+        // simples e eficaz: exponencial
+        return (long) Math.pow(2, attempts) * 5;
     }
 
 

@@ -2,6 +2,7 @@ package com.github.RenanAlmeida225.notification_service.useCases.notification;
 
 import com.github.RenanAlmeida225.notification_service.infra.database.repositories.NotificationRepository;
 import com.github.RenanAlmeida225.notification_service.models.notification.Notification;
+import com.github.RenanAlmeida225.notification_service.models.notification.NotificationStatus;
 import com.github.RenanAlmeida225.notification_service.useCases.sender.NotificationSender;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,11 @@ public class ProcessNotificationUseCase {
 
         Notification notification = repository.findById(notificationId)
                 .orElseThrow(() -> new RuntimeException("Notification not found"));
+
+        if (notification.getStatus() == NotificationStatus.SENT ||
+                notification.getStatus() == NotificationStatus.FAILED) {
+            return;
+        }
 
         if (!notification.canRetryNow(MAX_ATTEMPTS)) {
             return;
