@@ -4,7 +4,9 @@ import com.github.RenanAlmeida225.notification_service.infra.database.repositori
 import com.github.RenanAlmeida225.notification_service.models.notification.Notification;
 import com.github.RenanAlmeida225.notification_service.models.notification.NotificationChannel;
 import com.github.RenanAlmeida225.notification_service.models.notification.NotificationStatus;
+import com.github.RenanAlmeida225.notification_service.infra.metrics.NotificationMetrics;
 import com.github.RenanAlmeida225.notification_service.useCases.sender.NotificationSender;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 
 import java.util.*;
@@ -17,9 +19,11 @@ class ProcessNotificationUseCaseTest {
     void execute_whenSendSucceeds_marksAsSent() {
         InMemoryNotificationRepository repository = new InMemoryNotificationRepository();
         FakeNotificationSender sender = new FakeNotificationSender(false);
+        NotificationMetrics metrics = new NotificationMetrics(new SimpleMeterRegistry());
         ProcessNotificationUseCase useCase = new ProcessNotificationUseCase(
                 repository,
                 sender,
+                metrics,
                 3,
                 5,
                 2
@@ -44,17 +48,19 @@ class ProcessNotificationUseCaseTest {
     void execute_whenSendFails_marksAsRetrying() {
         InMemoryNotificationRepository repository = new InMemoryNotificationRepository();
         FakeNotificationSender sender = new FakeNotificationSender(true);
+        NotificationMetrics metrics = new NotificationMetrics(new SimpleMeterRegistry());
         ProcessNotificationUseCase useCase = new ProcessNotificationUseCase(
                 repository,
                 sender,
+                metrics,
                 3,
                 5,
                 2
         );
 
         Notification notification = new Notification(
-                NotificationChannel.SMS,
-                "000000000",
+                NotificationChannel.EMAIL,
+                "user@example.com",
                 "Hi",
                 "Test message"
         );
@@ -72,9 +78,11 @@ class ProcessNotificationUseCaseTest {
     void execute_whenRetrying_canProcessAgain() {
         InMemoryNotificationRepository repository = new InMemoryNotificationRepository();
         FakeNotificationSender sender = new FakeNotificationSender(false);
+        NotificationMetrics metrics = new NotificationMetrics(new SimpleMeterRegistry());
         ProcessNotificationUseCase useCase = new ProcessNotificationUseCase(
                 repository,
                 sender,
+                metrics,
                 3,
                 0,
                 2

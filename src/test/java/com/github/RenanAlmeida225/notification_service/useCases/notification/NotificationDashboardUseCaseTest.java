@@ -1,49 +1,50 @@
 package com.github.RenanAlmeida225.notification_service.useCases.notification;
 
+import com.github.RenanAlmeida225.notification_service.api.controllers.dto.NotificationDashboardResponse;
 import com.github.RenanAlmeida225.notification_service.infra.database.repositories.NotificationRepository;
-import com.github.RenanAlmeida225.notification_service.infra.metrics.NotificationMetrics;
 import com.github.RenanAlmeida225.notification_service.models.notification.Notification;
 import com.github.RenanAlmeida225.notification_service.models.notification.NotificationChannel;
 import com.github.RenanAlmeida225.notification_service.models.notification.NotificationStatus;
 import org.junit.jupiter.api.Test;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class SendNotificationUseCaseTest {
+class NotificationDashboardUseCaseTest {
 
     @Test
-    void execute_withIdempotencyKey_returnsSameId() {
+    void execute_aggregatesCountsByStatus() {
         InMemoryNotificationRepository repository = new InMemoryNotificationRepository();
-        PublishNotificationUseCase publisher = new PublishNotificationUseCase(null) {
-            @Override
-            public void publish(UUID notificationId) {
-                // no-op for tests
-            }
-        };
-        NotificationMetrics metrics = new NotificationMetrics(new SimpleMeterRegistry());
-        SendNotificationUseCase useCase = new SendNotificationUseCase(repository, publisher, metrics);
+        NotificationDashboardUseCase useCase = new NotificationDashboardUseCase(repository);
 
-        String key = "key-123";
-        Notification first = new Notification(
-                NotificationChannel.EMAIL,
-                "user@example.com",
-                "Hello",
-                "Test message"
-        );
-        UUID firstId = useCase.execute(first, key);
+        Notification pending = new Notification(NotificationChannel.EMAIL, "a@example.com", "A", "A");
+        Notification processing = new Notification(NotificationChannel.EMAIL, "b@example.com", "B", "B");
+        processing.markAsProcessing();
+        Notification retrying = new Notification(NotificationChannel.EMAIL, "c@example.com", "C", "C");
+        retrying.markAsRetrying(0);
+        Notification sent = new Notification(NotificationChannel.EMAIL, "d@example.com", "D", "D");
+        sent.markAsProcessing();
+        sent.markAsSent();
+        Notification failed = new Notification(NotificationChannel.EMAIL, "e@example.com", "E", "E");
+        failed.markAsProcessing();
+        failed.markAsFailed();
 
-        Notification second = new Notification(
-                NotificationChannel.EMAIL,
-                "user@example.com",
-                "Hello",
-                "Test message"
-        );
-        UUID secondId = useCase.execute(second, key);
+        repository.save(pending);
+        repository.save(processing);
+        repository.save(retrying);
+        repository.save(sent);
+        repository.save(failed);
 
-        assertEquals(firstId, secondId);
+        NotificationDashboardResponse response = useCase.execute();
+
+        assertEquals(5, response.total());
+        assertEquals(1, response.pending());
+        assertEquals(1, response.processing());
+        assertEquals(1, response.retrying());
+        assertEquals(3, response.pendingTotal());
+        assertEquals(1, response.sent());
+        assertEquals(1, response.failed());
     }
 
     private static class InMemoryNotificationRepository implements NotificationRepository {

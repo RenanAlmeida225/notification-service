@@ -1,6 +1,7 @@
 package com.github.RenanAlmeida225.notification_service.useCases.notification;
 
 import com.github.RenanAlmeida225.notification_service.infra.database.repositories.NotificationRepository;
+import com.github.RenanAlmeida225.notification_service.infra.metrics.NotificationMetrics;
 import com.github.RenanAlmeida225.notification_service.models.notification.Notification;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -16,10 +17,16 @@ import java.util.UUID;
 public class SendNotificationUseCase {
     private final NotificationRepository repository;
     private final PublishNotificationUseCase publisher;
+    private final NotificationMetrics metrics;
 
-    public SendNotificationUseCase(NotificationRepository repository, PublishNotificationUseCase publisher) {
+    public SendNotificationUseCase(
+            NotificationRepository repository,
+            PublishNotificationUseCase publisher,
+            NotificationMetrics metrics
+    ) {
         this.repository = repository;
         this.publisher = publisher;
+        this.metrics = metrics;
     }
 
     @Transactional
@@ -52,6 +59,7 @@ public class SendNotificationUseCase {
             throw e;
         }
 
+        metrics.incrementCreated();
         publishAfterCommit(notification.getId());
         return notification.getId();
     }

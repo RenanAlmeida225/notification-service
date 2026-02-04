@@ -7,6 +7,7 @@ import com.github.RenanAlmeida225.notification_service.useCases.notification.Not
 import com.github.RenanAlmeida225.notification_service.useCases.notification.SendNotificationUseCase;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -26,7 +27,10 @@ class NotificationControllerTest {
         SendNotificationUseCase sendUseCase = new StubSendNotificationUseCase(expectedId);
         NotificationDashboardUseCase dashboardUseCase = new StubNotificationDashboardUseCase();
         NotificationController controller = new NotificationController(sendUseCase, dashboardUseCase);
-        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new ApiExceptionHandler())
+                .setValidator(buildValidator())
+                .build();
 
         String json = """
                 {
@@ -50,7 +54,10 @@ class NotificationControllerTest {
         SendNotificationUseCase sendUseCase = new StubSendNotificationUseCase(UUID.randomUUID());
         NotificationDashboardUseCase dashboardUseCase = new StubNotificationDashboardUseCase();
         NotificationController controller = new NotificationController(sendUseCase, dashboardUseCase);
-        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new ApiExceptionHandler())
+                .setValidator(buildValidator())
+                .build();
 
         mockMvc.perform(get("/api/v1/notifications/dashboard"))
                 .andExpect(status().isOk())
@@ -63,11 +70,46 @@ class NotificationControllerTest {
                 .andExpect(jsonPath("$.failed").value(1));
     }
 
+    @Test
+    void postNotification_invalidEmail_returnsBadRequest() throws Exception {
+        SendNotificationUseCase sendUseCase = new StubSendNotificationUseCase(UUID.randomUUID());
+        NotificationDashboardUseCase dashboardUseCase = new StubNotificationDashboardUseCase();
+        NotificationController controller = new NotificationController(sendUseCase, dashboardUseCase);
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new ApiExceptionHandler())
+                .setValidator(buildValidator())
+                .build();
+
+        String json = """
+                {
+                  "channel": "EMAIL",
+                  "recipient": "not-an-email",
+                  "title": "Hello",
+                  "message": "Test message"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/notifications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fields.recipient").exists());
+    }
+
+    private static LocalValidatorFactoryBean buildValidator() {
+        LocalValidatorFactoryBean bean = new LocalValidatorFactoryBean();
+        bean.afterPropertiesSet();
+        return bean;
+    }
+
     private static class StubSendNotificationUseCase extends SendNotificationUseCase {
         private final UUID id;
 
         StubSendNotificationUseCase(UUID id) {
-            super(null, null);
+            super(null, null, new com.github.RenanAlmeida225.notification_service.infra.metrics.NotificationMetrics(
+                    new io.micrometer.core.instrument.simple.SimpleMeterRegistry()
+            ));
             this.id = id;
         }
 

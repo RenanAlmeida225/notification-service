@@ -1,49 +1,57 @@
 package com.github.RenanAlmeida225.notification_service.useCases.notification;
 
 import com.github.RenanAlmeida225.notification_service.infra.database.repositories.NotificationRepository;
-import com.github.RenanAlmeida225.notification_service.infra.metrics.NotificationMetrics;
 import com.github.RenanAlmeida225.notification_service.models.notification.Notification;
 import com.github.RenanAlmeida225.notification_service.models.notification.NotificationChannel;
 import com.github.RenanAlmeida225.notification_service.models.notification.NotificationStatus;
 import org.junit.jupiter.api.Test;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
+import java.lang.reflect.Field;
+import java.time.Instant;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class SendNotificationUseCaseTest {
+class ProcessingRecoverySchedulerTest {
 
     @Test
-    void execute_withIdempotencyKey_returnsSameId() {
+    void recoverStuckProcessing_marksAsRetryingWhenAttemptsRemain() throws Exception {
         InMemoryNotificationRepository repository = new InMemoryNotificationRepository();
-        PublishNotificationUseCase publisher = new PublishNotificationUseCase(null) {
-            @Override
-            public void publish(UUID notificationId) {
-                // no-op for tests
-            }
-        };
-        NotificationMetrics metrics = new NotificationMetrics(new SimpleMeterRegistry());
-        SendNotificationUseCase useCase = new SendNotificationUseCase(repository, publisher, metrics);
+        ProcessingRecoveryScheduler scheduler = new ProcessingRecoveryScheduler(repository, 3, 60);
 
-        String key = "key-123";
-        Notification first = new Notification(
-                NotificationChannel.EMAIL,
-                "user@example.com",
-                "Hello",
-                "Test message"
-        );
-        UUID firstId = useCase.execute(first, key);
+        Notification notification = new Notification(NotificationChannel.EMAIL, "a@example.com", "A", "A");
+        notification.markAsProcessing();
+        setLastAttemptAt(notification, Instant.now().minusSeconds(120));
+        repository.save(notification);
 
-        Notification second = new Notification(
-                NotificationChannel.EMAIL,
-                "user@example.com",
-                "Hello",
-                "Test message"
-        );
-        UUID secondId = useCase.execute(second, key);
+        scheduler.recoverStuckProcessing();
 
-        assertEquals(firstId, secondId);
+        Notification updated = repository.findById(notification.getId()).orElseThrow();
+        assertEquals(NotificationStatus.RETRYING, updated.getStatus());
+    }
+
+    @Test
+    void recoverStuckProcessing_marksAsFailedWhenMaxAttemptsReached() throws Exception {
+        InMemoryNotificationRepository repository = new InMemoryNotificationRepository();
+        ProcessingRecoveryScheduler scheduler = new ProcessingRecoveryScheduler(repository, 2, 60);
+
+        Notification notification = new Notification(NotificationChannel.EMAIL, "b@example.com", "B", "B");
+        notification.markAsProcessing();
+        notification.markAsRetrying(0);
+        notification.markAsProcessing();
+        setLastAttemptAt(notification, Instant.now().minusSeconds(120));
+        repository.save(notification);
+
+        scheduler.recoverStuckProcessing();
+
+        Notification updated = repository.findById(notification.getId()).orElseThrow();
+        assertEquals(NotificationStatus.FAILED, updated.getStatus());
+    }
+
+    private static void setLastAttemptAt(Notification notification, Instant value) throws Exception {
+        Field field = Notification.class.getDeclaredField("lastAttemptAt");
+        field.setAccessible(true);
+        field.set(notification, value);
     }
 
     private static class InMemoryNotificationRepository implements NotificationRepository {

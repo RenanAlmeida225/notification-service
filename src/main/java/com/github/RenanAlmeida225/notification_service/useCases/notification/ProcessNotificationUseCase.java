@@ -1,6 +1,7 @@
 package com.github.RenanAlmeida225.notification_service.useCases.notification;
 
 import com.github.RenanAlmeida225.notification_service.infra.database.repositories.NotificationRepository;
+import com.github.RenanAlmeida225.notification_service.infra.metrics.NotificationMetrics;
 import com.github.RenanAlmeida225.notification_service.models.notification.Notification;
 import com.github.RenanAlmeida225.notification_service.models.notification.NotificationStatus;
 import com.github.RenanAlmeida225.notification_service.useCases.sender.NotificationSender;
@@ -17,6 +18,7 @@ public class ProcessNotificationUseCase {
     private static final Logger logger = LoggerFactory.getLogger(ProcessNotificationUseCase.class);
     private final NotificationRepository repository;
     private final NotificationSender sender;
+    private final NotificationMetrics metrics;
     private final int maxAttempts;
     private final long initialBackoffSeconds;
     private final int backoffMultiplier;
@@ -24,12 +26,14 @@ public class ProcessNotificationUseCase {
     public ProcessNotificationUseCase(
             NotificationRepository repository,
             NotificationSender sender,
+            NotificationMetrics metrics,
             @Value("${notification.retry.max-attempts:3}") int maxAttempts,
             @Value("${notification.retry.initial-backoff-seconds:5}") long initialBackoffSeconds,
             @Value("${notification.retry.backoff-multiplier:2}") int backoffMultiplier
     ) {
         this.repository = repository;
         this.sender = sender;
+        this.metrics = metrics;
         this.maxAttempts = maxAttempts;
         this.initialBackoffSeconds = initialBackoffSeconds;
         this.backoffMultiplier = backoffMultiplier;
@@ -57,12 +61,15 @@ public class ProcessNotificationUseCase {
             sender.send(notification);
 
             notification.markAsSent();
+            metrics.incrementSent();
         } catch (Exception e) {
             logger.error("Failed to send notification {}. Will mark as retrying/failed.", notification.getId(), e);
             if (notification.canRetry(maxAttempts)) {
                 notification.markAsRetrying(calculateBackoffSeconds(notification.getAttempts()));
+                metrics.incrementRetrying();
             } else {
                 notification.markAsFailed();
+                metrics.incrementFailed();
             }
         } finally {
             repository.save(notification);

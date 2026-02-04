@@ -1,6 +1,7 @@
 package com.github.RenanAlmeida225.notification_service.api.controllers;
 
 import com.github.RenanAlmeida225.notification_service.api.controllers.dto.NotificationDashboardResponse;
+import com.github.RenanAlmeida225.notification_service.api.controllers.dto.NotificationResponse;
 import com.github.RenanAlmeida225.notification_service.api.controllers.dto.SendNotificationRequest;
 import com.github.RenanAlmeida225.notification_service.api.controllers.dto.SendNotificationResponse;
 import com.github.RenanAlmeida225.notification_service.models.notification.Notification;
@@ -46,8 +47,10 @@ public class NotificationController {
     }
 
     @GetMapping
-    public List<Notification> list() {
-        return useCase.findAll();
+    public List<NotificationResponse> list() {
+        return useCase.findAll().stream()
+                .map(NotificationController::toResponse)
+                .toList();
     }
 
     @GetMapping("/dashboard")
@@ -57,9 +60,24 @@ public class NotificationController {
 
     @GetMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
-    public Notification status(@PathVariable UUID id) {
-        return useCase.findById(id)
+    public NotificationResponse status(@PathVariable UUID id) {
+        Notification notification = useCase.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found"));
+        return toResponse(notification);
     }
 
+    private static NotificationResponse toResponse(Notification notification) {
+        return new NotificationResponse(
+                notification.getId(),
+                notification.getChannel(),
+                notification.getStatus(),
+                notification.getRecipient(),
+                notification.getTitle(),
+                notification.getMessage(),
+                notification.getAttempts(),
+                notification.getLastAttemptAt(),
+                notification.getNextAttemptAt(),
+                notification.getCreatedAt()
+        );
+    }
 }

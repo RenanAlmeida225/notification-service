@@ -1,49 +1,48 @@
 package com.github.RenanAlmeida225.notification_service.useCases.notification;
 
 import com.github.RenanAlmeida225.notification_service.infra.database.repositories.NotificationRepository;
-import com.github.RenanAlmeida225.notification_service.infra.metrics.NotificationMetrics;
 import com.github.RenanAlmeida225.notification_service.models.notification.Notification;
 import com.github.RenanAlmeida225.notification_service.models.notification.NotificationChannel;
 import com.github.RenanAlmeida225.notification_service.models.notification.NotificationStatus;
 import org.junit.jupiter.api.Test;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class SendNotificationUseCaseTest {
+class RetryNotificationsSchedulerTest {
 
     @Test
-    void execute_withIdempotencyKey_returnsSameId() {
+    void requeueEligibleRetries_publishesOnlyEligible() {
         InMemoryNotificationRepository repository = new InMemoryNotificationRepository();
-        PublishNotificationUseCase publisher = new PublishNotificationUseCase(null) {
-            @Override
-            public void publish(UUID notificationId) {
-                // no-op for tests
-            }
-        };
-        NotificationMetrics metrics = new NotificationMetrics(new SimpleMeterRegistry());
-        SendNotificationUseCase useCase = new SendNotificationUseCase(repository, publisher, metrics);
+        RecordingPublisher publisher = new RecordingPublisher();
+        RetryNotificationsScheduler scheduler = new RetryNotificationsScheduler(repository, publisher, 3);
 
-        String key = "key-123";
-        Notification first = new Notification(
-                NotificationChannel.EMAIL,
-                "user@example.com",
-                "Hello",
-                "Test message"
-        );
-        UUID firstId = useCase.execute(first, key);
+        Notification eligible = new Notification(NotificationChannel.EMAIL, "a@example.com", "A", "A");
+        eligible.markAsRetrying(0);
+        repository.save(eligible);
 
-        Notification second = new Notification(
-                NotificationChannel.EMAIL,
-                "user@example.com",
-                "Hello",
-                "Test message"
-        );
-        UUID secondId = useCase.execute(second, key);
+        Notification notReady = new Notification(NotificationChannel.EMAIL, "b@example.com", "B", "B");
+        notReady.markAsRetrying(60);
+        repository.save(notReady);
 
-        assertEquals(firstId, secondId);
+        scheduler.requeueEligibleRetries();
+
+        assertEquals(1, publisher.published.size());
+        assertEquals(eligible.getId(), publisher.published.getFirst());
+    }
+
+    private static class RecordingPublisher extends PublishNotificationUseCase {
+        private final List<UUID> published = new ArrayList<>();
+
+        RecordingPublisher() {
+            super(null);
+        }
+
+        @Override
+        public void publish(UUID notificationId) {
+            published.add(notificationId);
+        }
     }
 
     private static class InMemoryNotificationRepository implements NotificationRepository {

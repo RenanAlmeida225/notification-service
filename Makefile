@@ -1,4 +1,4 @@
-.PHONY: help up down build restart logs ps clean-db reset
+.PHONY: help up down build restart logs ps clean-db reset test-unit test coverage
 
 SERVICE ?= notification-service
 
@@ -12,6 +12,9 @@ help:
 	@echo "  make ps        - show service status"
 	@echo "  make clean-db  - truncate notifications table"
 	@echo "  make reset     - stop services and remove volumes (FULL RESET)"
+	@echo "  make test-unit - run unit tests only (exclude integration)"
+	@echo "  make test      - run all tests"
+	@echo "  make coverage  - run tests and generate coverage report"
 
 up:
 	docker compose up --build -d
@@ -37,3 +40,12 @@ clean-db:
 
 reset:
 	docker compose down -v
+
+test-unit:
+	mvn -Dtest=*Test,!*IntegrationTest test
+
+test:
+	mvn test
+
+coverage:
+	mvn test

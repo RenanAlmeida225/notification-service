@@ -134,6 +134,10 @@ public class Notification {
         return lastAttemptAt;
     }
 
+    public Instant getNextAttemptAt() {
+        return nextAttemptAt;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }

@@ -3,13 +3,26 @@
 Serviço de notificações com fila (RabbitMQ), persistência (Postgres), retry e envio de e‑mail via SMTP.
 
 ## Visão Geral
+
 - **API REST** para criar e consultar notificações
 - **Fila** para processamento assíncrono (RabbitMQ)
 - **Persistência** em Postgres (JPA/Hibernate)
 - **Retry automático** com backoff
 - **Envio de e‑mail real** via SMTP
 
+## Arquitetura (fluxo)
+
+```mermaid
+flowchart LR
+    Client --> API[API Spring Boot]
+    API --> DB[(Postgres)]
+    API --> MQ[(RabbitMQ Queue)]
+    MQ --> Worker[ProcessNotificationUseCase]
+    Worker --> SMTP[SMTP Email]
+```
+
 ## Stack
+
 - Java 21 + Spring Boot 4
 - Postgres 16
 - RabbitMQ 3
@@ -20,11 +33,49 @@ Serviço de notificações com fila (RabbitMQ), persistência (Postgres), retry 
 1. Configure o `.env`:
    - Copie `.env.example` para `.env` e preencha as variáveis.
 2. Suba o ambiente:
+
 ```bash
 make up
 ```
 
+3. Migrations rodam automaticamente via Flyway ao subir o serviço.
+
+## Quickstart (2 minutos)
+
+1. Suba o ambiente:
+
+```bash
+make up
+```
+
+2. Crie uma notificação:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/notifications \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 123e4567" \
+  -d '{
+    "channel":"EMAIL",
+    "recipient":"seu_email@gmail.com",
+    "title":"Exemplo",
+    "message":"Notificação de exemplo"
+  }'
+```
+
+3. Consulte o status:
+
+```bash
+curl http://localhost:8080/api/v1/notifications/{UUID}
+```
+
+4. Abra o dashboard:
+
+```bash
+curl http://localhost:8080/api/v1/notifications/dashboard
+```
+
 ## Comandos Úteis (Makefile)
+
 ```bash
 make up        # sobe tudo (build + up)
 make down      # derruba os serviços
@@ -34,15 +85,10 @@ make clean-db  # limpa tabela notifications
 make reset     # apaga volumes (FULL RESET)
 ```
 
-## Testes de Integração
-Este projeto usa **Testcontainers** para subir Postgres e RabbitMQ localmente.
-Para rodar:
-```bash
-./mvnw test
-```
-
 ## Variáveis de Ambiente
+
 Arquivo `.env`:
+
 ```
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
@@ -55,10 +101,10 @@ DB_NAME=notification_db
 DB_USER=notification
 DB_PASS=notification
 
-RABBIT_HOST=rabbitmq
-RABBIT_PORT=5672
-RABBIT_USER=guest
-RABBIT_PASS=guest
+ RABBIT_HOST=rabbitmq
+ RABBIT_PORT=5672
+ RABBIT_USER=guest
+ RABBIT_PASS=guest
 ```
 
 > **Gmail:** use **Senha de app** no `SMTP_PASS` (não a senha normal).
@@ -66,6 +112,7 @@ RABBIT_PASS=guest
 ## Endpoints
 
 ### Criar notificação
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/notifications \
   -H "Content-Type: application/json" \
@@ -82,81 +129,138 @@ curl -X POST http://localhost:8080/api/v1/notifications \
 > Se repetir o mesmo `Idempotency-Key`, a API retorna a mesma notificação.
 
 Resposta:
+
 ```json
 {
-  "id": "uuid",
-  "status": "PENDING"
+	"id": "uuid",
+	"status": "PENDING"
 }
 ```
 
 ### Erro de validação (400)
+
 ```json
 {
-  "error": "VALIDATION_ERROR",
-  "fields": {
-    "recipient": "must be a well-formed email address",
-    "title": "must not be blank"
-  }
+	"error": "VALIDATION_ERROR",
+	"fields": {
+		"recipient": "must be a well-formed email address",
+		"title": "must not be blank"
+	}
 }
 ```
 
 ### Erro de recurso não encontrado (404)
+
 ```json
 {
-  "error": "Notification not found",
-  "fields": {}
+	"error": "Notification not found",
+	"fields": {}
 }
 ```
 
 ### Consultar status
+
 ```bash
 curl http://localhost:8080/api/v1/notifications/{UUID}
 ```
 
 ### Dashboard
+
 ```bash
 curl http://localhost:8080/api/v1/notifications/dashboard
 ```
+
 Resposta inclui `pendingTotal`, que soma `PENDING + PROCESSING + RETRYING`.
 
 ### Listar todas
+
 ```bash
 curl http://localhost:8080/api/v1/notifications
 ```
 
 ## Healthcheck
+
 Actuator habilitado:
+
 ```bash
 curl http://localhost:8080/actuator/health
 ```
 
 Se quiser liveness/readiness:
+
 ```bash
 curl http://localhost:8080/actuator/health/liveness
 curl http://localhost:8080/actuator/health/readiness
 ```
 
+## Métricas
+
+Endpoint de métricas:
+
+```bash
+curl http://localhost:8080/actuator/metrics
+```
+
+Exemplo de métrica específica:
+
+```bash
+curl http://localhost:8080/actuator/metrics/jvm.memory.used
+```
+
+Métricas de domínio:
+
+```bash
+curl http://localhost:8080/actuator/metrics/notification.created
+curl http://localhost:8080/actuator/metrics/notification.sent
+curl http://localhost:8080/actuator/metrics/notification.failed
+curl http://localhost:8080/actuator/metrics/notification.retrying
+```
+
 ## Como Funciona o Fluxo
+
 1. `POST /notifications` cria e salva no banco
 2. ID é publicado na fila do RabbitMQ
 3. Worker consome a fila, processa e envia
 4. Status muda para `SENT`, `RETRYING` ou `FAILED`
 
+## Documentação da API
+
+Swagger UI disponível em `http://localhost:8080/swagger-ui/index.html`
+
+## Testes
+
+Unitários:
+
+```bash
+make test-unit
+```
+
+Todos:
+
+```bash
+make test
+```
+
+Cobertura (HTML):
+
+```bash
+make coverage
+```
+
+Relatório gerado em `target/site/jacoco/index.html`
+
 ### Recuperação de `PROCESSING`
+
 Se uma notificação ficar presa em `PROCESSING` por muito tempo (ex.: queda do serviço),
 um scheduler marca como `RETRYING` para que ela volte a ser processada.  
 Configurações:
+
 ```
 notification.processing.timeout-seconds=120
 notification.processing.recovery-delay-ms=10000
 ```
 
 ## Observações
+
 - `SENT` significa que o SMTP aceitou o envio.  
   Se o destinatário não existir, o Gmail envia um bounce depois.
-
-## Roadmap (sugestões para portfólio)
-- Tratamento de validação com erros em JSON
-- Healthcheck/metrics (Spring Actuator)
-- Testes de integração com Postgres/RabbitMQ
-- Recuperação de notificações travadas em `PROCESSING`
