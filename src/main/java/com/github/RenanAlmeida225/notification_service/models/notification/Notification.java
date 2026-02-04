@@ -71,7 +71,7 @@ public class Notification {
 
     public void markAsProcessing() {
         if (this.status != NotificationStatus.PENDING &&
-                this.status != NotificationStatus.FAILED) {
+                this.status != NotificationStatus.RETRYING) {
             throw new IllegalStateException("Notification cannot be processed");
         }
         this.status = NotificationStatus.PROCESSING;
@@ -90,15 +90,9 @@ public class Notification {
         return attempts < maxAttempts;
     }
 
-    public void markAsRetrying() {
+    public void markAsRetrying(long backoffSeconds) {
         this.status = NotificationStatus.RETRYING;
-        this.attempts++;
-        this.nextAttemptAt = Instant.now().plusSeconds(calculateBackoff());
-    }
-
-    private long calculateBackoff() {
-        // simples e eficaz: exponencial
-        return (long) Math.pow(2, attempts) * 5;
+        this.nextAttemptAt = Instant.now().plusSeconds(backoffSeconds);
     }
 
 

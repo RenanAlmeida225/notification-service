@@ -16,12 +16,16 @@ public class NotificationDashboardUseCase {
     public NotificationDashboardResponse execute() {
         long total = repository.count();
         long pending = repository.countByStatus(NotificationStatus.PENDING);
+        long processing = repository.countByStatus(NotificationStatus.PROCESSING);
+        long retrying = repository.countByStatus(NotificationStatus.RETRYING);
         long sent = repository.countByStatus(NotificationStatus.SENT);
         long failed = repository.countByStatus(NotificationStatus.FAILED);
 
         return new NotificationDashboardResponse(
                 total,
                 pending,
+                processing,
+                retrying,
                 sent,
                 failed
         );

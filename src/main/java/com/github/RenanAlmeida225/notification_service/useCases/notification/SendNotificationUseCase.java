@@ -3,6 +3,8 @@ package com.github.RenanAlmeida225.notification_service.useCases.notification;
 import com.github.RenanAlmeida225.notification_service.infra.database.repositories.NotificationRepository;
 import com.github.RenanAlmeida225.notification_service.models.notification.Notification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -22,7 +24,16 @@ public class SendNotificationUseCase {
     @Transactional
     public UUID execute(Notification notification) {
         repository.save(notification);
-        publisher.publish(notification.getId());
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    publisher.publish(notification.getId());
+                }
+            });
+        } else {
+            publisher.publish(notification.getId());
+        }
         return notification.getId();
     }
 

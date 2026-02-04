@@ -2,11 +2,14 @@ package com.github.RenanAlmeida225.notification_service.api.controllers;
 
 import com.github.RenanAlmeida225.notification_service.api.controllers.dto.NotificationDashboardResponse;
 import com.github.RenanAlmeida225.notification_service.api.controllers.dto.SendNotificationRequest;
+import com.github.RenanAlmeida225.notification_service.api.controllers.dto.SendNotificationResponse;
 import com.github.RenanAlmeida225.notification_service.models.notification.Notification;
 import com.github.RenanAlmeida225.notification_service.useCases.notification.NotificationDashboardUseCase;
 import com.github.RenanAlmeida225.notification_service.useCases.notification.SendNotificationUseCase;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+import jakarta.validation.Valid;
 
 import java.util.List;
 import java.util.UUID;
@@ -26,7 +29,7 @@ public class NotificationController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public String send(@RequestBody SendNotificationRequest request) {
+    public SendNotificationResponse send(@Valid @RequestBody SendNotificationRequest request) {
         Notification notification = new Notification(
                 request.channel(),
                 request.recipient(),
@@ -34,7 +37,10 @@ public class NotificationController {
                 request.message()
         );
 
-        return useCase.execute(notification).toString();
+        return new SendNotificationResponse(
+                useCase.execute(notification),
+                notification.getStatus()
+        );
     }
 
     @GetMapping
@@ -50,7 +56,8 @@ public class NotificationController {
     @GetMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
     public Notification status(@PathVariable UUID id) {
-        return useCase.findById(id).orElseThrow(() -> new RuntimeException("Notification not found"));
+        return useCase.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found"));
     }
 
 }

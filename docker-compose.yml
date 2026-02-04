@@ -6,13 +6,18 @@ services:
     image: postgres:16
     container_name: notification-postgres
     environment:
-      POSTGRES_DB: notification_db
-      POSTGRES_USER: notification
-      POSTGRES_PASSWORD: notification
+      POSTGRES_DB: ${DB_NAME:-notification_db}
+      POSTGRES_USER: ${DB_USER:-notification}
+      POSTGRES_PASSWORD: ${DB_PASS:-notification}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notification -d notification_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -20,22 +25,33 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   notification-service:
     build: .
     container_name: notification-service
     depends_on:
-      - postgres
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     ports:
       - "8080:8080"
+    env_file:
+      - .env
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notification_db
-      SPRING_DATASOURCE_USERNAME: notification
-      SPRING_DATASOURCE_PASSWORD: notification
+      SPRING_DATASOURCE_URL: ${DB_URL:-jdbc:postgresql://postgres:5432/notification_db}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-notification}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASS:-notification}
 
-      SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_HOST: ${RABBIT_HOST:-rabbitmq}
+      SPRING_RABBITMQ_PORT: ${RABBIT_PORT:-5672}
+      SPRING_RABBITMQ_USERNAME: ${RABBIT_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBIT_PASS:-guest}
 
 volumes:
   pgdata:
