@@ -2,6 +2,7 @@ package com.github.RenanAlmeida225.notification_service.useCases.notification;
 
 import com.github.RenanAlmeida225.notification_service.infra.database.repositories.NotificationRepository;
 import com.github.RenanAlmeida225.notification_service.models.notification.Notification;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -23,18 +24,49 @@ public class SendNotificationUseCase {
 
     @Transactional
     public UUID execute(Notification notification) {
-        repository.save(notification);
+        return execute(notification, null);
+    }
+
+    @Transactional
+    public UUID execute(Notification notification, String idempotencyKey) {
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            notification.setIdempotencyKey(idempotencyKey);
+            return repository.findByIdempotencyKey(idempotencyKey)
+                    .map(Notification::getId)
+                    .orElseGet(() -> saveAndPublish(notification));
+        }
+
+        return saveAndPublish(notification);
+    }
+
+    private UUID saveAndPublish(Notification notification) {
+        try {
+            repository.save(notification);
+        } catch (DataIntegrityViolationException e) {
+            String key = notification.getIdempotencyKey();
+            if (key != null && !key.isBlank()) {
+                return repository.findByIdempotencyKey(key)
+                        .map(Notification::getId)
+                        .orElseThrow(() -> e);
+            }
+            throw e;
+        }
+
+        publishAfterCommit(notification.getId());
+        return notification.getId();
+    }
+
+    private void publishAfterCommit(UUID id) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    publisher.publish(notification.getId());
+                    publisher.publish(id);
                 }
             });
         } else {
-            publisher.publish(notification.getId());
+            publisher.publish(id);
         }
-        return notification.getId();
     }
 
     public Optional<Notification> findById(UUID id) {

@@ -22,5 +22,7 @@ public interface NotificationRepository {
 
     List<Notification> findByStatusIn(List<NotificationStatus> statuses);
 
+    Optional<Notification> findByIdempotencyKey(String idempotencyKey);
+
 
 }

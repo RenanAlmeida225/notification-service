@@ -29,7 +29,10 @@ public class NotificationController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public SendNotificationResponse send(@Valid @RequestBody SendNotificationRequest request) {
+    public SendNotificationResponse send(
+            @Valid @RequestBody SendNotificationRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
+    ) {
         Notification notification = new Notification(
                 request.channel(),
                 request.recipient(),
@@ -37,10 +40,9 @@ public class NotificationController {
                 request.message()
         );
 
-        return new SendNotificationResponse(
-                useCase.execute(notification),
-                notification.getStatus()
-        );
+        UUID id = useCase.execute(notification, idempotencyKey);
+        Notification saved = useCase.findById(id).orElse(notification);
+        return new SendNotificationResponse(id, saved.getStatus());
     }
 
     @GetMapping

@@ -15,5 +15,7 @@ public interface JpaNotificationRepository extends JpaRepository<Notification, U
 
     List<Notification> findByStatusIn(List<NotificationStatus> statuses);
 
+    java.util.Optional<Notification> findByIdempotencyKey(String idempotencyKey);
+
 
 }

@@ -155,5 +155,12 @@ class ProcessNotificationUseCaseTest {
                     .filter(notification -> statuses.contains(notification.getStatus()))
                     .toList();
         }
+
+        @Override
+        public Optional<Notification> findByIdempotencyKey(String idempotencyKey) {
+            return store.values().stream()
+                    .filter(notification -> idempotencyKey.equals(notification.getIdempotencyKey()))
+                    .findFirst();
+        }
     }
 }

@@ -62,6 +62,7 @@ RABBIT_PASS=guest
 ```bash
 curl -X POST http://localhost:8080/api/v1/notifications \
   -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 123e4567" \
   -d '{
     "channel":"EMAIL",
     "recipient":"seu_email@gmail.com",
@@ -69,6 +70,9 @@ curl -X POST http://localhost:8080/api/v1/notifications \
     "message":"Primeira notificação"
   }'
 ```
+
+> A responsabilidade de gerar e enviar o `Idempotency-Key` é do cliente.  
+> Se repetir o mesmo `Idempotency-Key`, a API retorna a mesma notificação.
 
 Resposta:
 ```json

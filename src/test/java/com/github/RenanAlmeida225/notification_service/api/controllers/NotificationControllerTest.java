@@ -41,7 +41,8 @@ class NotificationControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json))
                 .andExpect(status().isCreated())
-                .andExpect(content().string(expectedId.toString()));
+                .andExpect(jsonPath("$.id").value(expectedId.toString()))
+                .andExpect(jsonPath("$.status").value("PENDING"));
     }
 
     @Test
@@ -72,6 +73,11 @@ class NotificationControllerTest {
 
         @Override
         public UUID execute(Notification notification) {
+            return id;
+        }
+
+        @Override
+        public UUID execute(Notification notification, String idempotencyKey) {
             return id;
         }
 

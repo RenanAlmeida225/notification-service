@@ -29,6 +29,8 @@ public class Notification {
     private Instant lastAttemptAt;
     private Instant nextAttemptAt;
     private Instant createdAt;
+    @Column(unique = true)
+    private String idempotencyKey;
 
 
     protected Notification() {
@@ -53,6 +55,10 @@ public class Notification {
         this.nextAttemptAt = Instant.now();
         this.createdAt = Instant.now();
 
+    }
+
+    public void setIdempotencyKey(String idempotencyKey) {
+        this.idempotencyKey = idempotencyKey;
     }
 
     public void markAsSent() {
@@ -130,5 +136,9 @@ public class Notification {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public String getIdempotencyKey() {
+        return idempotencyKey;
     }
 }
