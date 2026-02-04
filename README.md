@@ -106,6 +106,7 @@ curl http://localhost:8080/api/v1/notifications/{UUID}
 ```bash
 curl http://localhost:8080/api/v1/notifications/dashboard
 ```
+Resposta inclui `pendingTotal`, que soma `PENDING + PROCESSING + RETRYING`.
 
 ### Listar todas
 ```bash
@@ -129,6 +130,15 @@ curl http://localhost:8080/actuator/health/readiness
 2. ID é publicado na fila do RabbitMQ
 3. Worker consome a fila, processa e envia
 4. Status muda para `SENT`, `RETRYING` ou `FAILED`
+
+### Recuperação de `PROCESSING`
+Se uma notificação ficar presa em `PROCESSING` por muito tempo (ex.: queda do serviço),
+um scheduler marca como `RETRYING` para que ela volte a ser processada.  
+Configurações:
+```
+notification.processing.timeout-seconds=120
+notification.processing.recovery-delay-ms=10000
+```
 
 ## Observações
 - `SENT` significa que o SMTP aceitou o envio.  

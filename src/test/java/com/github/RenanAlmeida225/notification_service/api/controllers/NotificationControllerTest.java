@@ -57,6 +57,7 @@ class NotificationControllerTest {
                 .andExpect(jsonPath("$.pending").value(4))
                 .andExpect(jsonPath("$.processing").value(2))
                 .andExpect(jsonPath("$.retrying").value(1))
+                .andExpect(jsonPath("$.pendingTotal").value(7))
                 .andExpect(jsonPath("$.sent").value(2))
                 .andExpect(jsonPath("$.failed").value(1));
     }
@@ -98,7 +99,7 @@ class NotificationControllerTest {
 
         @Override
         public NotificationDashboardResponse execute() {
-            return new NotificationDashboardResponse(10, 4, 2, 1, 2, 1);
+            return new NotificationDashboardResponse(10, 4, 2, 1, 7, 2, 1);
         }
     }
 }

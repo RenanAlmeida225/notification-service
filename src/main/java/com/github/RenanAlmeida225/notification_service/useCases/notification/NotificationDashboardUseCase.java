@@ -18,6 +18,7 @@ public class NotificationDashboardUseCase {
         long pending = repository.countByStatus(NotificationStatus.PENDING);
         long processing = repository.countByStatus(NotificationStatus.PROCESSING);
         long retrying = repository.countByStatus(NotificationStatus.RETRYING);
+        long pendingTotal = pending + processing + retrying;
         long sent = repository.countByStatus(NotificationStatus.SENT);
         long failed = repository.countByStatus(NotificationStatus.FAILED);
 
@@ -26,6 +27,7 @@ public class NotificationDashboardUseCase {
                 pending,
                 processing,
                 retrying,
+                pendingTotal,
                 sent,
                 failed
         );

@@ -5,6 +5,7 @@ public record NotificationDashboardResponse(
         long pending,
         long processing,
         long retrying,
+        long pendingTotal,
         long sent,
         long failed
 ) {
