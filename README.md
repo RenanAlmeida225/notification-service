@@ -34,6 +34,13 @@ make clean-db  # limpa tabela notifications
 make reset     # apaga volumes (FULL RESET)
 ```
 
+## Testes de Integração
+Este projeto usa **Testcontainers** para subir Postgres e RabbitMQ localmente.
+Para rodar:
+```bash
+./mvnw test
+```
+
 ## Variáveis de Ambiente
 Arquivo `.env`:
 ```
